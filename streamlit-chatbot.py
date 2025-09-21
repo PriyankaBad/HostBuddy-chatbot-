@@ -82,7 +82,7 @@ if st.button("Send") and user_input:
     reply = get_reply(user_input)
     st.session_state.messages.append(("You", user_input))
     st.session_state.messages.append(("Bot", reply))
-    st.experimental_rerun()
+    #st.experimental_rerun()
 
 # display chat history
 for sender, message in st.session_state.messages:
@@ -90,3 +90,4 @@ for sender, message in st.session_state.messages:
         st.markdown(f"**You:** {message}")
     else:
         st.markdown(f"**Bot:** {message}")
+
