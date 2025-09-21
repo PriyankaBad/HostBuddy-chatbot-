@@ -1,86 +1,90 @@
-import streamlit as st
+# streamlit-chatbot.py
 import os
+import streamlit as st
 from dotenv import load_dotenv
-from pathlib import Path
 
-# --- Load environment variables ---
-load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# --- hybrid secrets loader (Streamlit secrets first; fallback to .env locally) ---
+try:
+    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+    SQUARE_ACCESS_TOKEN = st.secrets["SQUARE_ACCESS_TOKEN"]
+    SQUARE_LOCATION_ID = st.secrets["SQUARE_LOCATION_ID"]
+except Exception:
+    # local dev fallback
+    load_dotenv()
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    SQUARE_ACCESS_TOKEN = os.getenv("SQUARE_ACCESS_TOKEN")
+    SQUARE_LOCATION_ID = os.getenv("SQUARE_LOCATION_ID")
 
-# Debug: Check if key is loaded
-#st.write("Loaded OpenAI Key:", OPENAI_API_KEY[:8] if OPENAI_API_KEY else "Not Found")
+# debug (remove before submission)
+st.write("Current working directory:", os.getcwd())
+st.write("Loaded OpenAI Key:", (OPENAI_API_KEY[:8] + "...") if OPENAI_API_KEY else "Not Found")
 
-# --- OpenAI client (new SDK) ---
+# --- OpenAI new SDK client ---
 from openai import OpenAI
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
-# --- Try to import and fetch catalog from Square sandbox ---
+# --- import catalog helper ---
 try:
     from square_api import fetch_catalog
-    catalog = fetch_catalog()
+    catalog = fetch_catalog(SQUARE_ACCESS_TOKEN, SQUARE_LOCATION_ID)
 except ImportError:
-    st.error("Could not import square_api module. Please ensure square_api.py is in the same directory.")
+    st.error("Could not import square_api module. Ensure square_api.py is in repo root.")
     catalog = {}
 except Exception as e:
-    st.error(f"Error fetching catalog: {str(e)}")
+    st.error(f"Error fetching catalog: {e}")
     catalog = {}
 
-# --- Streamlit page config ---
+# --- Streamlit UI ---
 st.set_page_config(page_title="Commerce Chatbot", page_icon="💬")
 st.title("Commerce Chatbot")
 
-# --- Session state for conversation ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- Function to generate chatbot reply ---
-def get_reply(user_message):
-    user_message_lower = user_message.lower()
+def get_reply(user_message: str) -> str:
+    text = user_message.lower()
+    # direct catalog match
+    for item, price in catalog.items():
+        if item in text:
+            return f"The {item} costs ${price:.2f}."
 
-    # Check catalog first
-    matched_item = None
-    for item in catalog:
-        if item in user_message_lower:
-            matched_item = item
-            break
-    if matched_item:
-        return f"The {matched_item} costs ${catalog[matched_item]:.2f}."
+    # fallback to GPT (only if client available)
+    if not client:
+        return "OpenAI not configured. Please set API key."
 
-    # Fallback: OpenAI GPT if client is available
-    if client:
-        prompt = (
-            f"The user asked: '{user_message}'. "
-            f"Available items: {list(catalog.keys())}. "
-            "If the question is about an item, return its name exactly; else return 'NOT_FOUND'."
+    prompt = (
+        f"The user asked: '{user_message}'. Available items: {list(catalog.keys())}. "
+        "If the question is about an item, return its name exactly; else return 'NOT_FOUND'."
+    )
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant for commerce queries."},
+                {"role": "user", "content": prompt},
+            ],
         )
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant for commerce queries."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            item_from_gpt = response.choices[0].message.content.strip().lower()
-            if item_from_gpt in catalog:
-                return f"The {item_from_gpt} costs ${catalog[item_from_gpt]:.2f}."
-            else:
-                return "Sorry, I couldn't find that item in the catalog."
-        except Exception as e:
-            return f"OpenAI API Error: {str(e)}"
-    else:
-        return "OpenAI client not available. Please set OPENAI_API_KEY."
+        item_from_gpt = resp.choices[0].message.content.strip().lower()
+        if item_from_gpt in catalog:
+            return f"The {item_from_gpt} costs ${catalog[item_from_gpt]:.2f}."
+        if item_from_gpt == "not_found":
+            return "I couldn't find the item in the catalog."
+        # Example: handle list requests explicitly by returning a readable list
+        if "list" in user_message.lower() or "how many" in user_message.lower():
+            names = ", ".join(sorted(catalog.keys()))
+            return f"There are {len(catalog)} items: {names}."
+        return "Sorry, I couldn't understand the question."
+    except Exception as e:
+        return f"OpenAI API Error: {e}"
 
-# --- Input box ---
-user_input = st.text_input("You:", "")
-
+user_input = st.text_input("You:")
 if st.button("Send") and user_input:
     reply = get_reply(user_input)
     st.session_state.messages.append(("You", user_input))
     st.session_state.messages.append(("Bot", reply))
-    st.rerun()
+    st.experimental_rerun()
 
-# --- Display chat history ---
+# display chat history
 for sender, message in st.session_state.messages:
     if sender == "You":
         st.markdown(f"**You:** {message}")
