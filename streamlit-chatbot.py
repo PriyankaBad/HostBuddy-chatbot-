@@ -16,8 +16,8 @@ except Exception:
     SQUARE_LOCATION_ID = os.getenv("SQUARE_LOCATION_ID")
 
 # debug (remove before submission)
-st.write("Current working directory:", os.getcwd())
-st.write("Loaded OpenAI Key:", (OPENAI_API_KEY[:8] + "...") if OPENAI_API_KEY else "Not Found")
+#st.write("Current working directory:", os.getcwd())
+#st.write("Loaded OpenAI Key:", (OPENAI_API_KEY[:8] + "...") if OPENAI_API_KEY else "Not Found")
 
 # --- OpenAI new SDK client ---
 from openai import OpenAI
@@ -37,6 +37,14 @@ except Exception as e:
 # --- Streamlit UI ---
 st.set_page_config(page_title="Commerce Chatbot", page_icon="💬")
 st.title("Commerce Chatbot")
+# Intro message
+st.write(
+    """
+    💬 **Welcome to the HostBuddy AI Agent chatbot !**  
+    Ask me questions about product prices, like *"How much is the burrito?"*  
+    You can also ask about other items in the catalog. (eg. burrito,soda,taco)
+    """
+)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -69,6 +77,9 @@ def get_reply(user_message: str) -> str:
             return f"The {item_from_gpt} costs ${catalog[item_from_gpt]:.2f}."
         if item_from_gpt == "not_found":
             return "I couldn't find the item in the catalog."
+    except Exception as e:
+    # Catch any OpenAI errors and show a friendly message
+    return "Sorry, I cannot answer that right now. Please try another question."
         # Example: handle list requests explicitly by returning a readable list
         if "list" in user_message.lower() or "how many" in user_message.lower():
             names = ", ".join(sorted(catalog.keys()))
@@ -90,4 +101,5 @@ for sender, message in st.session_state.messages:
         st.markdown(f"**You:** {message}")
     else:
         st.markdown(f"**Bot:** {message}")
+
 
