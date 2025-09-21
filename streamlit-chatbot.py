@@ -35,8 +35,8 @@ except Exception as e:
     catalog = {}
 
 # --- Streamlit UI ---
-st.set_page_config(page_title="Commerce Chatbot", page_icon="💬")
-st.title("Commerce Chatbot")
+st.set_page_config(page_title="HostBuddy Restaurant Chatbot", page_icon="💬")
+st.title("HostBuddy Restaurant Chatbot")
 # Intro message
 st.write(
     """
@@ -101,5 +101,6 @@ for sender, message in st.session_state.messages:
         st.markdown(f"**You:** {message}")
     else:
         st.markdown(f"**Bot:** {message}")
+
 
 
