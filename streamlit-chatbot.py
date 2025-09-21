@@ -77,9 +77,6 @@ def get_reply(user_message: str) -> str:
             return f"The {item_from_gpt} costs ${catalog[item_from_gpt]:.2f}."
         if item_from_gpt == "not_found":
             return "I couldn't find the item in the catalog."
-    except Exception as e:
-    # Catch any OpenAI errors and show a friendly message
-    return "Sorry, I cannot answer that right now. Please try another question."
         # Example: handle list requests explicitly by returning a readable list
         if "list" in user_message.lower() or "how many" in user_message.lower():
             names = ", ".join(sorted(catalog.keys()))
@@ -101,6 +98,7 @@ for sender, message in st.session_state.messages:
         st.markdown(f"**You:** {message}")
     else:
         st.markdown(f"**Bot:** {message}")
+
 
 
 
